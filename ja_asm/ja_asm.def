@@ -1,0 +1,3 @@
+LIBRARY "ja_asm"
+EXPORTS
+FileASM
