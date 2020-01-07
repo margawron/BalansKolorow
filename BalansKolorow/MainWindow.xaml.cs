@@ -180,7 +180,7 @@ namespace BalansKolorow
 
         private unsafe void RunCPP(object sender, RoutedEventArgs e)
         {
-            CPPMultiplication();
+            CPPAddition();
         }
 
         private unsafe void CPPAddition()
