@@ -4,12 +4,14 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="MainWindow" Height="139" Width="386">
-    <Grid Margin="0,0,10,0" Height="107">
-        <Button x:Name="przycisk1" Content="Launch C++" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Height="54" Width="104" Click="LaunchCPP"/>
-        <Button x:Name="przycisk2" Content="Launch ASM" HorizontalAlignment="Left" Margin="132,10,0,0" VerticalAlignment="Top" Height="54" Width="104" Click="LauchASM"/>
-        <Button x:Name="przycisk3" Content="Hello World" Margin="254,10,16,0" VerticalAlignment="Top" Height="54" Click="LaunchHelloWorld"/>
-        <TextBox x:Name="textbox" Margin="10,75,10,0" Text="TextBox" TextWrapping="Wrap" VerticalAlignment="Top"/>
-
+        Title="MainWindow" Height="1024" Width="1280" MinWidth="1280">
+    <Grid Margin="0,0,2,0">
+        <Button Name="SelectBitmapButton" Content="Wybierz bitmapę" HorizontalAlignment="Left" Margin="10,15,0,0" Width="108" Click="LoadBitmap" Height="38" VerticalAlignment="Top"/>
+        <TextBox Name="BitmapUriTextBox" Margin="136,20,0,0" TextWrapping="Wrap" Text="" IsReadOnly="True" HorizontalAlignment="Left" Width="607" Height="23" VerticalAlignment="Top"/>
+        <Image Name="ImageView" Margin="10,74,10,10"/>
+        <Button Name="ButtonUseCPP" Content="Użyj C++" Margin="1184,19,0,0" HorizontalAlignment="Left" Width="76" Height="20" Click="RunCPP" VerticalAlignment="Top"/>
+        <Button Name="ButtonUseASM" Content="Użyj Assemblera" Margin="1070,19,0,0" HorizontalAlignment="Left" Width="100" Height="20" VerticalAlignment="Top"/>
+        <Label Content="Ilość wątków:" Margin="748,17,0,0" HorizontalAlignment="Left" Width="80" Height="26" VerticalAlignment="Top"/>
+        <Slider Name="SliderAmountOfThreads" Margin="833,19,0,0" HorizontalAlignment="Left" Width="212" Height="18" VerticalAlignment="Top" Minimum="1" Maximum="64" SmallChange="1" LargeChange="4" AutoToolTipPlacement="TopLeft" AutoToolTipPrecision="0" />
     </Grid>
 </Window>
