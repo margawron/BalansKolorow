@@ -1,13 +1,14 @@
 ﻿using Microsoft.Win32;
 using System;
+using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Media.Imaging;
-using System.Security;
-using System.Diagnostics;
+using System.Management;
 
 
 
@@ -21,10 +22,10 @@ namespace BalansKolorow
     {
         // Uchwyt do kontrolki z widokiem na obraz
         System.Windows.Controls.Image imageView;
-        // Uchwyt do kontrolki z wyborem ilości wątków
-        System.Windows.Controls.Slider sliderThreads;
         // Uchwyt do kontrolki ze ścieżka do bitmapy
         System.Windows.Controls.TextBox bitmapPathTextBox;
+
+        bool wasBitmapLoaded = false;
 
         // Ścieżka do pliku
         string bitmapFilename;
@@ -36,24 +37,35 @@ namespace BalansKolorow
         int height;
         // stoper
         Stopwatch stopwatch;
-    
+
 
         [DllImport("ja_cpp.dll", EntryPoint = "AdditionBitmapColorBalancer")]
-        public extern static unsafe void CPPAdditionBalance(byte* bitmap, int size, byte* argb);
+        public extern static unsafe void CPPAdditionLibraryMethod(byte* bitmap, int size, byte* argb);
+
+        [DllImport("ja_cpp.dll", EntryPoint = "SubtractionBitmapColorBalancer")]
+        public extern static unsafe void CPPSubtractionLibraryMethod(byte* bitmap, int size, byte* argb);
 
         [DllImport("ja_cpp.dll", EntryPoint = "MultiplicationColorBalancer")]
-        public extern static unsafe void CPPMultiplicationBalance(byte* bitmap, int size, float* argb);
+        public extern static unsafe void CPPMultiplicationLibraryMethod(byte* bitmap, int size, float* argb);
 
-        [DllImport("ja_asm.dll", CallingConvention = CallingConvention.StdCall, EntryPoint = "FileASM")]
-        public extern static IntPtr FileASM();
+        [DllImport("ja_asm.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "AdditionBitmapColorBalancer")]
+        public extern static unsafe void ASMAdditionLibraryMethod(byte* bitmap, int size, byte* argb);
 
-        // 
+        [DllImport("ja_asm.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "SubtractionBitmapColorBalancer")]
+        public extern static unsafe void ASMSubtractionLibraryMethod(byte* bitmap, int size, byte* argb);
+
+        [DllImport("ja_asm.dll", CallingConvention = CallingConvention.Cdecl, EntryPoint = "MultiplicationColorBalancer")]
+        public extern static unsafe void ASMMultiplicationLibraryMethod(byte* bitmap, int size, float* argb);
+
         public MainWindow()
         {
             InitializeComponent();
-            imageView = (System.Windows.Controls.Image)this.FindName("ImageView");
-            sliderThreads = (System.Windows.Controls.Slider)this.FindName("SliderAmountOfThreads");
-            bitmapPathTextBox = (System.Windows.Controls.TextBox)this.FindName("BitmapUriTextBox");
+            flatRadioButton.IsChecked = true;
+            imageView = (System.Windows.Controls.Image)FindName("ImageView");
+            bitmapPathTextBox = (System.Windows.Controls.TextBox)FindName("BitmapUriTextBox");
+            updateValueTextBoxes();
+            SetNumberOfThreads();
+
         }
         // Obsługa przycisku "Wybierz bitmapę"
         private void LoadBitmap(object sender, RoutedEventArgs e)
@@ -61,8 +73,9 @@ namespace BalansKolorow
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "Bitmap|*.bmp";
             openFileDialog.FilterIndex = 1;
-            if(openFileDialog.ShowDialog() == true)
+            if (openFileDialog.ShowDialog() == true)
             {
+                wasBitmapLoaded = true;
                 // Odbierz nazwę pliku
                 bitmapFilename = openFileDialog.FileName;
                 // Ustaw ścieżkę pliku w polu tekstowym
@@ -78,6 +91,7 @@ namespace BalansKolorow
 
         private void SaveBitmap(Bitmap bitmap)
         {
+            imageView.Source = Convert(bitmap);
             bitmap.Save("save.bmp");
         }
 
@@ -85,7 +99,7 @@ namespace BalansKolorow
         public Bitmap ConvertBitmapToBgra32(Bitmap bitmap)
         {
             // Sprawdz czy obraz nie jest już w dobrym formacie
-            if (bitmap.PixelFormat == System.Drawing.Imaging.PixelFormat.Format32bppArgb)
+            if (bitmap.PixelFormat == PixelFormat.Format32bppArgb)
             {
                 return bitmap; // Jest Ok, nic nie zmieniaj
             }
@@ -119,13 +133,13 @@ namespace BalansKolorow
             // W tym przypadku nie skaluj
             var rect = new Rectangle(0, 0, bitmap.Width, bitmap.Height);
             // "Przytrzymaj" bitmapę w pamięci w trybie R/W oraz w formacie BGRA (little endian)
-            BitmapData bitmapInArgb = bitmap.LockBits(rect,ImageLockMode.ReadWrite,PixelFormat.Format32bppArgb);
+            BitmapData bitmapInArgb = bitmap.LockBits(rect, ImageLockMode.ReadWrite, PixelFormat.Format32bppArgb);
             // Wielkość tablicy w pixelach * rozmiar pixela
             int sizeOfTheArray = width * height * 4;
             // Alokacja pamięci
             imageBytes = new byte[sizeOfTheArray];
             // Skopiuj bitmapę do tablicy bajtów
-            Marshal.Copy(bitmapInArgb.Scan0, imageBytes, 0 , sizeOfTheArray);
+            Marshal.Copy(bitmapInArgb.Scan0, imageBytes, 0, sizeOfTheArray);
             // Uwolnij bitmapę
             bitmap.UnlockBits(bitmapInArgb);
 
@@ -164,85 +178,320 @@ namespace BalansKolorow
             return image;
         }
 
-        // TODO
         private void goVisual() { Console.WriteLine("TODO"); }
 
-
-        private void DebugInfo()
+        private float expFunction(double val)
         {
-            Console.WriteLine("Byte array has size of {0}", bitmapByteArray.Length);
-            Console.WriteLine($"width: {width}, bitmapHeight: {height}");
-            for (int i = 0; i < (bitmapByteArray.Length < 64 ? bitmapByteArray.Length : 64); i += 4)
+            return (float)Math.Pow((val + 255), 3) / 16000000;
+        }
+
+
+        // Obsługa zmiany wartości slidera
+        private void onSliderToolTipChange(object sender, RoutedEventArgs e)
+        {
+            updateValueTextBoxes();
+        }
+
+        private void updateValueTextBoxes()
+        {
+            if (flatRadioButton.IsChecked.Value)
             {
-                Console.WriteLine($"Bytes {bitmapByteArray[i]}, {bitmapByteArray[i + 1]}, {bitmapByteArray[i + 2]}, {bitmapByteArray[i+3]}" );
+                redText.Text = redComponent.Value.ToString();
+                redText.UpdateLayout();
+                greenText.Text = greenComponent.Value.ToString();
+                greenText.UpdateLayout();
+                blueText.Text = blueComponent.Value.ToString();
+                blueText.UpdateLayout();
+            }
+            else
+            {
+                var redVal = expFunction(redComponent.Value).ToString();
+                redText.Text = redVal.Length < 4 ? redVal : redVal.Remove(4);
+                redText.UpdateLayout();
+                var greenVal = expFunction(greenComponent.Value).ToString();
+                greenText.Text = greenVal.Length < 4 ? greenVal : greenVal.Remove(4);
+                greenText.UpdateLayout();
+                var blueVal = expFunction(blueComponent.Value).ToString();
+                blueText.Text = blueVal.Length < 4 ? blueVal : blueVal.Remove(4);
+                blueText.UpdateLayout();
+
             }
         }
 
-        private unsafe void RunCPP(object sender, RoutedEventArgs e)
+        private void SetNumberOfThreads()
         {
-            CPPAddition();
-        }
-
-        private unsafe void CPPAddition()
-        {
-            stopwatch = new Stopwatch();
-            byte[] argb = new byte[4];
-            argb[0] = 0;  // Alpha
-            argb[1] = 50; // Red
-            argb[2] = 0;  // Green
-            argb[3] = 0;  // Blue
-            fixed (byte* bitmapPointer = bitmapByteArray, argbPointer = argb)
+            int coreCount = 0;
+            foreach (var item in new System.Management.ManagementObjectSearcher("Select * from Win32_Processor").Get())
             {
-                stopwatch.Reset();
-                stopwatch.Start();
-                // TODO dodać wielowątkowość
-                CPPAdditionBalance(bitmapPointer, bitmapByteArray.Length, argbPointer);
-                stopwatch.Stop();
+                coreCount += int.Parse(item["NumberOfCores"].ToString());
             }
-            Console.WriteLine("Operation took: {0} ms", stopwatch.ElapsedMilliseconds);
-            var bitmap = BytesToBitmap(bitmapByteArray);
-            SaveBitmap(bitmap);
+            Console.WriteLine("Number Of Cores: {0}", coreCount);
+            SliderAmountOfThreads.Value = coreCount;
         }
 
-        private unsafe void CPPMultiplication()
+        private int GetNumberOfThreads()
+        {
+            return (int)Math.Ceiling(SliderAmountOfThreads.Value);
+        }
+
+        // Obsługa przycisku Użyj C++
+        private void RunCPP(object sender, RoutedEventArgs e)
+        {
+            // Mnożenie ustawić jako slider nieliniowy 
+            // https://stackoverflow.com/questions/7246622/how-to-create-a-slider-with-a-non-linear-scale
+            if (wasBitmapLoaded)
+            {
+                if (flatRadioButton.IsChecked.Value)
+                    CPPFlat();
+                else
+                    CPPRelative();
+            }
+            else
+            {
+                var msgBox = MessageBox.Show("Nie wybrano bitmapy do załadowania", "Wybierz bitmapę", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+        // Obsługa przycisku Użyj Asemblera
+        private void RunASM(object sender, RoutedEventArgs e)
+        {
+            if (wasBitmapLoaded)
+            {
+                if (flatRadioButton.IsChecked.Value)
+                    ASMFlat();
+                else
+                    ASMRelative();
+            }
+            else
+            {
+                var msgBox = MessageBox.Show("Nie wybrano bitmapy do załadowania", "Wybierz bitmapę", MessageBoxButton.OK, MessageBoxImage.Warning);
+
+            }
+        }
+
+        private byte[] GetByteColorValues(bool getOnlyPositives)
+        {
+            byte[] bgra = new byte[4];
+            if (getOnlyPositives)
+            {
+                bgra[0] = blueComponent.Value >= 0 ? (byte)blueComponent.Value : (byte)0;
+                bgra[1] = greenComponent.Value >= 0 ? (byte)greenComponent.Value : (byte)0;
+                bgra[2] = redComponent.Value >= 0 ? (byte)redComponent.Value : (byte)0;
+                bgra[3] = 0;
+            }
+            else
+            {
+
+                bgra[0] = blueComponent.Value <= 0 ? (byte)Math.Abs(blueComponent.Value) : (byte)0;
+                bgra[1] = greenComponent.Value <= 0 ? (byte)Math.Abs(greenComponent.Value) : (byte)0;
+                bgra[2] = redComponent.Value <= 0 ? (byte)Math.Abs(redComponent.Value) : (byte)0;
+                bgra[3] = 0;
+            }
+            return bgra;
+        }
+
+        private float[] GetFloatColorValues()
+        {
+            float[] bgra = new float[4];
+            bgra[0] = expFunction(blueComponent.Value);
+            bgra[1] = expFunction(greenComponent.Value);
+            bgra[2] = expFunction(redComponent.Value);
+            bgra[3] = 0;
+            return bgra;
+        }
+
+
+
+        private unsafe void CPPFlat()
         {
             stopwatch = new Stopwatch();
-            // TODO pobrać kolory
-            float[] argb = new float[4];
-            argb[0] = 1f;  // Alpha
-            argb[1] = 1f; // Red
-            argb[2] = 1f;  // Green
-            argb[3] = 3f;  // Blue
-            fixed (byte* bitmapPointer = bitmapByteArray)
+            byte[] bgraForAdding = GetByteColorValues(true);
+            byte[] bgraForSubtracting = GetByteColorValues(false);
+            int numOfThreads = GetNumberOfThreads();
+            var length = bitmapByteArray.Length;
+            var pixelsInBitmap = length / 4;
+            var pixelsForSingleThread = pixelsInBitmap / numOfThreads;
+            var perThreadOffset = pixelsForSingleThread * 4;
+            var remainderOfPixelsForLastThread = length % numOfThreads;
+            var remainderToFinishOffset = remainderOfPixelsForLastThread * 4;
+            Console.WriteLine($"Launching flat image conversion using cpp with {numOfThreads} threads");
+            ParallelOptions parallelOptions = new ParallelOptions();
+            parallelOptions.MaxDegreeOfParallelism = numOfThreads;
+            stopwatch.Reset();
+            stopwatch.Start();
+            Parallel.For(0, numOfThreads, parallelOptions, i =>
             {
-                fixed (float* argbPointer = argb)
+                if (i == numOfThreads - 1)
                 {
-                    stopwatch.Reset();
-                    stopwatch.Start();
-                    // TODO dodać wielowątkowość
-                    CPPMultiplicationBalance(bitmapPointer, bitmapByteArray.Length, argbPointer);
-                    stopwatch.Stop();
+                    fixed (byte* bgraAdd = bgraForAdding, bgraSub = bgraForSubtracting)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMAdditionLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraAdd);
+                            ASMSubtractionLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraSub);
+
+                        }
+                    }
                 }
-            }
+                else
+                {
+                    fixed (byte* bgraAdd = bgraForAdding, bgraSub = bgraForSubtracting)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMAdditionLibraryMethod(bitmapPointer, perThreadOffset, bgraAdd);
+                            ASMSubtractionLibraryMethod(bitmapPointer, perThreadOffset, bgraSub);
+
+                        }
+                    }
+                }
+            });
+            stopwatch.Stop();
+            Console.WriteLine($"Operation using cpp with {numOfThreads} threads took: {stopwatch.ElapsedMilliseconds} ms");
+            var bitmap = BytesToBitmap(bitmapByteArray);
+            SaveBitmap(bitmap);
+        }
+
+        private unsafe void CPPRelative()
+        {
+            stopwatch = new Stopwatch();
+            float[] bgra = GetFloatColorValues();
+            int numOfThreads = GetNumberOfThreads();
+            var length = bitmapByteArray.Length;
+            var pixelsInBitmap = length / 4;
+            var pixelsForSingleThread = pixelsInBitmap / numOfThreads;
+            var perThreadOffset = pixelsForSingleThread * 4;
+            var remainderOfPixelsForLastThread = length % numOfThreads;
+            var remainderToFinishOffset = remainderOfPixelsForLastThread * 4;
+            Console.WriteLine($"Launching relative image conversion using asm with {numOfThreads} threads");
+            ParallelOptions parallelOptions = new ParallelOptions();
+            parallelOptions.MaxDegreeOfParallelism = numOfThreads;
+            stopwatch.Reset();
+            stopwatch.Start();
+            Parallel.For(0, numOfThreads, parallelOptions, i =>
+            {
+                if (i == numOfThreads - 1)
+                {
+                    fixed (float* bgraPtr = bgra)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            CPPMultiplicationLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraPtr);
+
+                        }
+                    }
+                }
+                else
+                {
+                    fixed (float* bgraPtr = bgra)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            CPPMultiplicationLibraryMethod(bitmapPointer, perThreadOffset, bgraPtr);
+
+                        }
+                    }
+                }
+            });
+            stopwatch.Stop();
             Console.WriteLine("Operation took: {0} ms", stopwatch.ElapsedMilliseconds);
             var bitmap = BytesToBitmap(bitmapByteArray);
             SaveBitmap(bitmap);
         }
 
-    }
-}
+        private unsafe void ASMFlat()
+        {
+            stopwatch = new Stopwatch();
+            byte[] bgraForAdding = GetByteColorValues(true);
+            byte[] bgraForSubtracting = GetByteColorValues(false);
+            int numOfThreads = GetNumberOfThreads();
+            var length = bitmapByteArray.Length;
+            var pixelsInBitmap = length / 4;
+            var pixelsForSingleThread = pixelsInBitmap / numOfThreads;
+            var perThreadOffset = pixelsForSingleThread * 4;
+            var remainderOfPixelsForLastThread = length % numOfThreads;
+            var remainderToFinishOffset = remainderOfPixelsForLastThread * 4;
+            Console.WriteLine($"Launching flat image conversion using asm with {numOfThreads} threads");
+            ParallelOptions parallelOptions = new ParallelOptions();
+            parallelOptions.MaxDegreeOfParallelism = numOfThreads;
+            stopwatch.Reset();
+            stopwatch.Start();
+            Parallel.For(0, numOfThreads, parallelOptions, i =>
+            {
+                if (i == numOfThreads - 1)
+                {
+                    fixed (byte* bgraAdd = bgraForAdding, bgraSub = bgraForSubtracting)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMAdditionLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraAdd);
+                            ASMSubtractionLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraSub);
 
-/**
- * public void TestMethod()
-{
-    var incoming = new byte[100];
-    fixed (byte* inBuf = incoming)
-    {
-        byte* outBuf = bufferOperations(inBuf, incoming.Length);
-        // Assume, that the same buffer is returned, only with data changed.
-        // Or by any other means, get the real lenght of output buffer (e.g. from library docs, etc).
-        for (int i = 0; i < incoming.Length ; i++)
-           incoming[i] = outBuf[i];
+                        }
+                    }
+                }
+                else
+                {
+                    fixed (byte* bgraAdd = bgraForAdding, bgraSub = bgraForSubtracting)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMAdditionLibraryMethod(bitmapPointer, perThreadOffset, bgraAdd);
+                            ASMSubtractionLibraryMethod(bitmapPointer, perThreadOffset, bgraSub);
+
+                        }
+                    }
+                }
+            });
+            stopwatch.Stop();
+            Console.WriteLine($"Operation using asm with {numOfThreads} threads took: {stopwatch.ElapsedMilliseconds} ms");
+            var bitmap = BytesToBitmap(bitmapByteArray);
+            SaveBitmap(bitmap);
+        }
+        private unsafe void ASMRelative()
+        {
+            stopwatch = new Stopwatch();
+            float[] bgra = GetFloatColorValues();
+            int numOfThreads = GetNumberOfThreads();
+            var length = bitmapByteArray.Length;
+            var pixelsInBitmap = length / 4;
+            var pixelsForSingleThread = pixelsInBitmap / numOfThreads;
+            var perThreadOffset = pixelsForSingleThread * 4;
+            var remainderOfPixelsForLastThread = length % numOfThreads;
+            var remainderToFinishOffset = remainderOfPixelsForLastThread * 4;
+            Console.WriteLine($"Launching relative image conversion using asm with {numOfThreads} threads");
+            ParallelOptions parallelOptions = new ParallelOptions();
+            parallelOptions.MaxDegreeOfParallelism = numOfThreads;
+            stopwatch.Reset();
+            stopwatch.Start();
+            Parallel.For(0, numOfThreads, parallelOptions, i =>
+            {
+                if (i == numOfThreads - 1)
+                {
+                    fixed (float* bgraPtr = bgra)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMMultiplicationLibraryMethod(bitmapPointer, perThreadOffset + remainderToFinishOffset, bgraPtr);
+
+                        }
+                    }
+                }
+                else
+                {
+                    fixed (float* bgraPtr = bgra)
+                    {
+                        fixed (byte* bitmapPointer = &bitmapByteArray[i * perThreadOffset])
+                        {
+                            ASMMultiplicationLibraryMethod(bitmapPointer, perThreadOffset, bgraPtr);
+
+                        }
+                    }
+                }
+            });
+            stopwatch.Stop();
+            Console.WriteLine("Operation took: {0} ms", stopwatch.ElapsedMilliseconds);
+            var bitmap = BytesToBitmap(bitmapByteArray);
+            SaveBitmap(bitmap);
+        }
     }
 }
-*/

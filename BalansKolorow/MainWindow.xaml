@@ -3,15 +3,28 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:BalansKolorow"
         mc:Ignorable="d"
-        Title="MainWindow" Height="1024" Width="1280" MinWidth="1280">
-    <Grid Margin="0,0,2,0">
-        <Button Name="SelectBitmapButton" Content="Wybierz bitmapę" HorizontalAlignment="Left" Margin="10,15,0,0" Width="108" Click="LoadBitmap" Height="38" VerticalAlignment="Top"/>
-        <TextBox Name="BitmapUriTextBox" Margin="136,20,0,0" TextWrapping="Wrap" Text="" IsReadOnly="True" HorizontalAlignment="Left" Width="607" Height="23" VerticalAlignment="Top"/>
-        <Image Name="ImageView" Margin="10,74,10,10"/>
-        <Button Name="ButtonUseCPP" Content="Użyj C++" Margin="1184,19,0,0" HorizontalAlignment="Left" Width="76" Height="20" Click="RunCPP" VerticalAlignment="Top"/>
-        <Button Name="ButtonUseASM" Content="Użyj Assemblera" Margin="1070,19,0,0" HorizontalAlignment="Left" Width="100" Height="20" VerticalAlignment="Top"/>
-        <Label Content="Ilość wątków:" Margin="748,17,0,0" HorizontalAlignment="Left" Width="80" Height="26" VerticalAlignment="Top"/>
-        <Slider Name="SliderAmountOfThreads" Margin="833,19,0,0" HorizontalAlignment="Left" Width="212" Height="18" VerticalAlignment="Top" Minimum="1" Maximum="64" SmallChange="1" LargeChange="4" AutoToolTipPlacement="TopLeft" AutoToolTipPrecision="0" />
+        Title="Balans Kolorów" Height="937" Width="920" MinWidth="920" MaxWidth="920" MinHeight="400">
+    <Grid Margin="0,0,0,0">
+        <Button Name="SelectBitmapButton" Content="Wybierz bitmapę" Margin="16,10,788,0" Click="LoadBitmap" Height="38" VerticalAlignment="Top" RenderTransformOrigin="0.898,0.579"/>
+        <TextBox Name="BitmapUriTextBox" Margin="136,20,0,0" TextWrapping="Wrap" Text="" IsReadOnly="True" HorizontalAlignment="Left" Width="748" Height="23" VerticalAlignment="Top"/>
+        <Image Name="ImageView" Margin="10,187,10,10"/>
+        <Button Name="ButtonUseCPP" Content="Użyj C++" Margin="808,108,0,0" HorizontalAlignment="Left" Width="76" Height="20" Click="RunCPP" VerticalAlignment="Top"/>
+        <Button Name="ButtonUseASM" Content="Użyj Asemblera" Margin="679,108,0,0" HorizontalAlignment="Left" Width="100" Height="20" Click="RunASM" VerticalAlignment="Top"/>
+        <Label Content="Ilość wątków:" Margin="605,71,0,0" HorizontalAlignment="Left" Width="80" Height="26" VerticalAlignment="Top"/>
+        <Slider Name="SliderAmountOfThreads" IsSnapToTickEnabled="True" Margin="690,74,0,0" HorizontalAlignment="Left" Width="212" Height="18" VerticalAlignment="Top" Minimum="1" Maximum="64" SmallChange="1" LargeChange="4" AutoToolTipPlacement="TopLeft" AutoToolTipPrecision="0" />
+        <Slider Height="24" ValueChanged="onSliderToolTipChange"  Name="redComponent" IsSnapToTickEnabled="True" HorizontalAlignment="Left" Margin="54,74,0,0" VerticalAlignment="Top"  Width="511" Minimum="-255" Maximum="255" SmallChange="1" LargeChange="4"/>
+        <Slider Height="24" ValueChanged="onSliderToolTipChange" Name="greenComponent" IsSnapToTickEnabled="True" HorizontalAlignment="Left" Margin="54,114,0,0" VerticalAlignment="Top" Width="511" Minimum="-255" Maximum="255" SmallChange="1" LargeChange="4" />
+        <Slider Height="24" ValueChanged="onSliderToolTipChange" Name="blueComponent" IsSnapToTickEnabled="True" HorizontalAlignment="Left" Margin="54,158,0,0" VerticalAlignment="Top" Width="511" Minimum="-255" Maximum="255" SmallChange="1" LargeChange="4" />
+        <Label Height="30" Width="25" Content="R:" HorizontalAlignment="Left" Margin="16,71,0,0" VerticalAlignment="Top" />
+        <Label Height="30" Width="25" Content="G:" HorizontalAlignment="Left" Margin="16,108,0,0" VerticalAlignment="Top"/>
+        <Label Height="30" Width="25" Content="B:" HorizontalAlignment="Left" Margin="16,150,0,0" VerticalAlignment="Top" />
+        <RadioButton Click="onSliderToolTipChange" GroupName="lauchOptions" Name="flatRadioButton" Content="Płaski" HorizontalAlignment="Left" Margin="709,158,0,0" VerticalAlignment="Top" />
+        <RadioButton Click="onSliderToolTipChange" GroupName="lauchOptions" Name="relativeRadioButton" Content="Relatywny" HorizontalAlignment="Left" Margin="808,158,0,0" VerticalAlignment="Top" RenderTransformOrigin="-0.042,0.533"/>
+        <Label Content="Sposób działania" HorizontalAlignment="Left" Margin="679,133,0,0" VerticalAlignment="Top"/>
+        <TextBox Name="redText" HorizontalAlignment="Left" Height="23" Margin="570,74,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="35" IsReadOnly="True"/>
+        <TextBox Name="greenText" HorizontalAlignment="Left" Height="23" Margin="570,114,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="35" IsReadOnly="True"/>
+        <TextBox Name="blueText" HorizontalAlignment="Left" Height="23" Margin="570,157,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="35" IsReadOnly="True"/>
     </Grid>
 </Window>

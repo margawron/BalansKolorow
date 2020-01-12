@@ -1,3 +1,5 @@
 LIBRARY "ja_asm"
 EXPORTS
-FileASM
+AdditionBitmapColorBalancer
+SubtractionBitmapColorBalancer
+MultiplicationColorBalancer
