@@ -5,6 +5,7 @@ text DB "Hello ASM", 0FFH
 
 
 .code 
+
 AdditionBitmapColorBalancer PROC bitmapPointer:QWORD, bitmapSize:QWORD, argbPointer:QWORD
 	; kolejnoœæ rejestrów przechowuj¹cych parametry 
 	; RCX,RDX,R8,R9,XMM0-XMM3,YMM0-YMM3,ZMM0-ZMM3
@@ -38,6 +39,7 @@ add_single_work:
 add_no_work:
 	ret						; wyjdŸ
 AdditionBitmapColorBalancer endp
+
 SubtractionBitmapColorBalancer PROC bitmapPointer:QWORD, bitmapSize:QWORD, argbPointer:QWORD
 	; kolejnoœæ rejestrów przechowuj¹cych parametry 
 	; RCX,RDX,R8,R9,XMM0-XMM3,YMM0-YMM3,ZMM0-ZMM3
@@ -71,6 +73,7 @@ sub_single_work:
 sub_no_work:
 	ret						; wyjdŸ
 SubtractionBitmapColorBalancer endp
+
 MultiplicationColorBalancer PROC bitmapPointer:QWORD, bitmapSize:QWORD, argbPointer:QWORD
 	; kolejnoœæ rejestrów przechowuj¹cych parametry 
 	; RCX,RDX,R8,R9,XMM0-XMM3,YMM0-YMM3,ZMM0-ZMM3
@@ -87,9 +90,9 @@ mult_work:
 	cvtdq2ps xmm0,xmm0	; przekonwertuj inty do floatów
 	mulps xmm0,xmm1		; pomnó¿ przekonwertowane komponenty pixela przez tablicê konwersji
 	cvtps2dq xmm0,xmm0	; przekonwertuj pomno¿ony wynik na integery (float -> int)
-	pabsd xmm0,xmm0		; wyci¹gnij wartoœæ bezwzglêdn¹
-	packusdw xmm0,xmm0  ; przekonwertuj na 16-bitów (32-bit -> 16-bit)
-	packuswb xmm0,xmm0	; przekonwertuj na 8-bitów (16-bit -> 8-bit)
+	;pabsd xmm0,xmm0		; wyci¹gnij wartoœæ bezwzglêdn¹
+	packusdw xmm0,xmm0  ; przekonwertuj na 16-bitów (32-bit -> 16-bit) z saturacj¹
+	packuswb xmm0,xmm0	; przekonwertuj na 8-bitów (16-bit -> 8-bit) z saturacj¹
 	movd DWORD PTR[rcx+rdx-4],xmm0 ; zapisz wynik
 	sub rdx, 4			; pomniejsz liczbê pixeli do przetworzenia o 1
 	jmp mult_work		; powtórz pojedynczy pixel
