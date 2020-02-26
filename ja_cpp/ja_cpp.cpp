@@ -6,7 +6,7 @@
 const char* hello = "Hello Cpp";
 
 using okres = std::chrono::duration<int, std::pico>;
-
+	
 extern "C" {
 
 
@@ -33,7 +33,6 @@ extern "C" {
 				bitmap[i + 2] = saturateColors(bitmap[i + 2], bgra[2]);	// red
 				bitmap[i + 3] = saturateColors(bitmap[i + 3], bgra[3]);	// alpha
 				std::this_thread::sleep_for(okres(sleepFor));
-
 			}
 		}
 
